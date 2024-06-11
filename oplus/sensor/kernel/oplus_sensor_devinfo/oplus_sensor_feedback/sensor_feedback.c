@@ -23,6 +23,9 @@
 #include <linux/vmalloc.h>
 #include "scp_helper.h"
 #include "sensor_feedback.h"
+#ifdef CONFIG_OPLUS_FEATURE_FEEDBACK
+#include <soc/oplus/system/kernel_fb.h>
+#endif
 
 #define SENSOR_DEVICE_TYPE      "10002"
 #define SENSOR_POWER_TYPE       "10003"
@@ -69,7 +72,6 @@ struct sensor_fb_conf g_fb_conf[] = {
     {ACCEL_FIRST_REPORT_DELAY_COUNT_ID, "device_acc_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
     {ACCEL_ORIGIN_DATA_TO_ZERO_ID, "device_acc_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
     {ACCEL_CALI_DATA_ID, "device_acc_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-    {ACCEL_DATA_BLOCK_ID, "device_acc_data_block", SENSOR_DEBUG_DEVICE_TYPE},
 
 
     {GYRO_INIT_FAIL_ID, "device_gyro_init_fail", SENSOR_DEVICE_TYPE},
@@ -80,7 +82,7 @@ struct sensor_fb_conf g_fb_conf[] = {
     {GYRO_FIRST_REPORT_DELAY_COUNT_ID, "device_gyro_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
     {GYRO_ORIGIN_DATA_TO_ZERO_ID, "device_gyro_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
     {GYRO_CALI_DATA_ID, "device_gyro_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-    {GYRO_DATA_BLOCK_ID, "device_gyro_data_block", SENSOR_DEBUG_DEVICE_TYPE},
+
 
     {MAG_INIT_FAIL_ID, "device_mag_init_fail", SENSOR_DEVICE_TYPE},
     {MAG_I2C_ERR_ID, "device_mag_i2c_err", SENSOR_DEVICE_TYPE},
@@ -240,6 +242,9 @@ static ssize_t hal_info_store(struct device *dev,
         strbuf);
     pr_info("payload =%s\n", payload);
 
+#ifdef CONFIG_OPLUS_FEATURE_FEEDBACK
+    oplus_kevent_fb(FB_SENSOR, g_fb_conf[index].fb_event_id, payload);
+#endif
     return count;
 }
 
@@ -387,6 +392,9 @@ static int parse_shr_info(struct sensor_fb_cxt *sensor_fb_cxt)
                 sensor_fb_cxt->fb_smem.event[count].count,
                 detail_buff);
         pr_info("payload =%s\n", payload);
+#ifdef CONFIG_OPLUS_FEATURE_FEEDBACK
+        oplus_kevent_fb(FB_SENSOR, g_fb_conf[index].fb_event_id, payload);
+#endif
     }
 
     return ret;

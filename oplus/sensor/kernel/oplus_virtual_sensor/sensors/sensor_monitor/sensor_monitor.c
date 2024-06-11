@@ -229,17 +229,10 @@ static void enable_work_callback(struct work_struct *work)
     }
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
-static void enable_timer_callback(unsigned long data)
+static void enable_timer_callback()
 {
     queue_work(enable_wq, &enable_work);
 }
-#else
-static void enable_timer_callback(struct timer_list *unused)
-{
-    queue_work(enable_wq, &enable_work);
-}
-#endif
 
 static void enable_timer_init(void)
 {

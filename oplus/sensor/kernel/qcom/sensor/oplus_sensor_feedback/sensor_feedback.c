@@ -24,6 +24,9 @@
 #include <linux/version.h>
 
 #include "sensor_feedback.h"
+#if defined(CONFIG_OPLUS_FEATURE_FEEDBACK) || defined(CONFIG_OPLUS_FEATURE_FEEDBACK_MODULE)
+#include <soc/oplus/system/kernel_fb.h>
+#endif
 
 #define ALIGN4(s) ((sizeof(s) + 3)&(~0x3))
 
@@ -105,11 +108,7 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{PS_FIRST_REPORT_DELAY_COUNT_ID, "device_ps_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
 	{PS_ORIGIN_DATA_TO_ZERO_ID, "device_ps_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{PS_CALI_DATA_ID, "device_ps_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{PS_OFFSET_DATA_ID, "device_ps_offset_data", SENSOR_DEVICE_TYPE},
-	{PS_PD_DATA_ID, "device_ps_pd_data", SENSOR_DEVICE_TYPE},
-	{PS_BOOT_PD_DATA_ID, "device_ps_boot_pd_data", SENSOR_DEVICE_TYPE},
-	{PS_DYNAMIC_CALI_ID, "device_ps_dynamic_cali", SENSOR_DEBUG_DEVICE_TYPE},
-	{PS_ZERO_CALI_ID, "device_ps_zero_cali", SENSOR_DEBUG_DEVICE_TYPE},
+
 
 	{ALS_INIT_FAIL_ID, "device_als_init_fail", SENSOR_DEVICE_TYPE},
 	{ALS_I2C_ERR_ID, "device_als_i2c_err", SENSOR_DEVICE_TYPE},
@@ -131,7 +130,6 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{ACCEL_CALI_DATA_ID, "device_acc_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
 	{ACCEL_DATA_BLOCK_ID, "device_acc_data_block", SENSOR_DEVICE_TYPE},
 	{ACCEL_SUB_DATA_BLOCK_ID, "device_sub_acc_data_block", SENSOR_DEVICE_TYPE},
-	{ACCEL_DATA_FULL_RANGE_ID, "device_acc_data_full_range", SENSOR_DEVICE_TYPE},
 
 	{GYRO_INIT_FAIL_ID, "device_gyro_init_fail", SENSOR_DEVICE_TYPE},
 	{GYRO_I2C_ERR_ID, "device_gyro_i2c_err", SENSOR_DEVICE_TYPE},
@@ -151,8 +149,7 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{MAG_FIRST_REPORT_DELAY_COUNT_ID, "device_mag_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
 	{MAG_ORIGIN_DATA_TO_ZERO_ID, "device_mag_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{MAG_CALI_DATA_ID, "device_mag_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{MAG_DATA_BLOCK_ID, "device_mag_data_block_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{MAG_DATA_FULL_RANGE_ID, "device_mag_data_full_range", SENSOR_DEBUG_DEVICE_TYPE},
+
 
 	{SAR_INIT_FAIL_ID, "device_sar_init_fail", SENSOR_DEVICE_TYPE},
 	{SAR_I2C_ERR_ID, "device_sar_i2c_err", SENSOR_DEVICE_TYPE},
@@ -162,8 +159,7 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{SAR_FIRST_REPORT_DELAY_COUNT_ID, "device_sar_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
 	{SAR_ORIGIN_DATA_TO_ZERO_ID, "device_sar_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{SAR_CALI_DATA_ID, "device_sar_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{HALL_STATUS_ID, "device_hall_status", SENSOR_DEVICE_TYPE},
-	{HALL_TRIGGER_COUNT, "hall_trigger_count", SENSOR_DEVICE_TYPE},
+
 
 	{POWER_SENSOR_INFO_ID, "debug_power_sns_info", SENSOR_DEBUG_POWER_TYPE},
 	{POWER_ACCEL_INFO_ID, "debug_power_acc_info", SENSOR_DEBUG_POWER_TYPE},
@@ -218,11 +214,7 @@ static int find_event_id(int16_t event_id)
 
 static struct timespec oplus_current_kernel_time(void) {
 	struct timespec64 ts64;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
-        ts64 = current_kernel_time64();
-#else
 	ktime_get_coarse_real_ts64(&ts64);
-#endif
 	return timespec64_to_timespec(ts64);
 }
 
@@ -342,6 +334,9 @@ static void cal_subsystem_sleep_ratio(struct subsystem_desc *subsystem_desc) {
 							adsp_sleep_ratio_fied,
 							subsystem_desc[index].subsys_name,
 							subsys_sleep_ratio);
+					#if defined(CONFIG_OPLUS_FEATURE_FEEDBACK) || defined(CONFIG_OPLUS_FEATURE_FEEDBACK_MODULE)
+					oplus_kevent_fb(FB_SENSOR, SENSOR_POWER_TYPE, payload);
+					#endif
 			}
 		}
 	}
@@ -363,8 +358,8 @@ static ssize_t adsp_notify_show(struct device *dev,
 	spin_lock(&sensor_fb_cxt->rw_lock);
 	adsp_event_counts = sensor_fb_cxt->adsp_event_counts;
 	spin_unlock(&sensor_fb_cxt->rw_lock);
-	pr_info("adsp_value = %u\n", adsp_event_counts);
-	return snprintf(buf, PAGE_SIZE, "%u\n", adsp_event_counts);
+	pr_info("adsp_value = %d\n", adsp_event_counts);
+	return snprintf(buf, PAGE_SIZE, "%d\n", adsp_event_counts);
 }
 
 static ssize_t adsp_notify_store(struct device *dev,
@@ -433,6 +428,9 @@ static ssize_t hal_info_store(struct device *dev,
 				strbuf);
 	pr_info("payload =%s\n", payload);
 
+	#if defined(CONFIG_OPLUS_FEATURE_FEEDBACK) || defined(CONFIG_OPLUS_FEATURE_FEEDBACK_MODULE)
+	oplus_kevent_fb(FB_SENSOR, g_fb_conf[index].fb_event_id, payload);
+	#endif
 	return count;
 }
 
@@ -533,6 +531,18 @@ static int read_data_from_share_mem(struct sensor_fb_cxt *sensor_fb_cxt)
 	void *smem_addr = NULL;
 	struct fb_event_smem *fb_event = NULL;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+        int rc = 0;
+        smem_size = ALIGN4(struct fb_event_smem);
+        rc = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_SENSOR_FEEDBACK, smem_size);
+        if (rc < 0 && rc != -EEXIST) {
+                pr_err("%s smem_alloc fail\n", __func__);
+                rc = -EFAULT;
+                return rc;
+        }
+
+        smem_size = 0;
+#endif
 	smem_addr = qcom_smem_get(QCOM_SMEM_HOST_ANY,
 			SMEM_SENSOR_FEEDBACK,
 			&smem_size);
@@ -553,22 +563,6 @@ static int read_data_from_share_mem(struct sensor_fb_cxt *sensor_fb_cxt)
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-static int reserve_fb_share_mem()
-{
-	int rc = 0;
-	size_t smem_size = 0;
-
-	smem_size = ALIGN4(struct fb_event_smem);
-	rc = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_SENSOR_FEEDBACK, smem_size);
-	if (rc < 0 && rc != -EEXIST) {
-		pr_err("%s smem_alloc fail\n", __func__);
-		rc = -EFAULT;
-		 return rc;
-	}
-	return 0;
-}
-#endif
 
 static struct delivery_type delivery_t[2] = {
 	{
@@ -699,12 +693,15 @@ static int parse_shr_info(struct sensor_fb_cxt *sensor_fb_cxt)
 			sensor_fb_cxt->fb_smem.event[count].buff[1],
 			sensor_fb_cxt->fb_smem.event[count].buff[2]);
 		fb_len += scnprintf(payload, sizeof(payload),
-				"NULL$$EventField@@%s$$FieldData@@%d$$detailData@@%s$$SensorName@@0x%x",
+				"NULL$$EventField@@%s$$FieldData@@%d$$detailData@@%s",
 				g_fb_conf[index].fb_field,
 				sensor_fb_cxt->fb_smem.event[count].count,
-				detail_buff,
-                                sensor_fb_cxt->fb_smem.event[count].name);
+				detail_buff);
 		pr_info("payload1 =%s\n", payload);
+#if defined(CONFIG_OPLUS_FEATURE_FEEDBACK) || defined(CONFIG_OPLUS_FEATURE_FEEDBACK_MODULE)
+		oplus_kevent_fb(FB_SENSOR, g_fb_conf[index].fb_event_id, payload);
+		pr_info("send oplus kevent fb\n");
+#endif
 	}
 
 	return ret;
@@ -938,14 +935,6 @@ static int sensor_feedback_probe(struct platform_device *pdev)
 		goto sleep_ratio_init_failed;
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-	err = reserve_fb_share_mem();
-	if(err) {
-		pr_info("reserve_fb_share_mem failed\n");
-		goto reserve_fb_share_mem_failed;
-	}
-#endif
-
 	/*create sensor_feedback_task thread*/
 	sensor_fb_cxt->report_task = kthread_create(sensor_report_thread,
 			(void *)sensor_fb_cxt,
@@ -963,9 +952,6 @@ static int sensor_feedback_probe(struct platform_device *pdev)
 	return 0;
 create_task_failed:
 sleep_ratio_init_failed:
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-reserve_fb_share_mem_failed:
-#endif
 create_sensor_node_failed:
 	kfree(sensor_fb_cxt);
 	g_sensor_fb_cxt = NULL;
